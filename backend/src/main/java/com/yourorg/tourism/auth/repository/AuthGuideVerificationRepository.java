@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.yourorg.tourism.auth.entity.GuideVerificationEntity;
 
-public interface GuideVerificationRepository extends JpaRepository<GuideVerificationEntity, UUID> {
+public interface AuthGuideVerificationRepository extends JpaRepository<GuideVerificationEntity, UUID> {
 }

@@ -11,7 +11,7 @@ import com.yourorg.tourism.auth.dto.RegisterRequestDto;
 import com.yourorg.tourism.auth.dto.RegisterRole;
 import com.yourorg.tourism.auth.entity.GuideVerificationEntity;
 import com.yourorg.tourism.auth.mapper.AuthMapper;
-import com.yourorg.tourism.auth.repository.GuideVerificationRepository;
+import com.yourorg.tourism.auth.repository.AuthGuideVerificationRepository;
 import com.yourorg.tourism.auth.security.JwtService;
 import com.yourorg.tourism.common.exception.AppException;
 import com.yourorg.tourism.common.exception.ErrorCode;
@@ -23,14 +23,14 @@ import com.yourorg.tourism.user.service.UserService;
 public class AuthService {
 
     private final UserService userService;
-    private final GuideVerificationRepository guideVerificationRepository;
+    private final AuthGuideVerificationRepository guideVerificationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthMapper authMapper;
 
     public AuthService(
             UserService userService,
-            GuideVerificationRepository guideVerificationRepository,
+            AuthGuideVerificationRepository guideVerificationRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             AuthMapper authMapper

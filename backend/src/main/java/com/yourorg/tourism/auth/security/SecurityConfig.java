@@ -41,6 +41,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasAnyRole("ADMIN", "GUIDE", "TOURIST")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/guides/verification/apply").hasRole("GUIDE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/guides/verification/me").hasRole("GUIDE")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/verifications/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/verifications/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/places/**").hasAnyRole("ADMIN", "GUIDE", "TOURIST")
+                        .requestMatchers("/api/v1/admin/places/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
