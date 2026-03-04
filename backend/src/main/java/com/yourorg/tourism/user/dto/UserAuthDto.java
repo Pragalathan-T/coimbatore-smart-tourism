@@ -9,6 +9,7 @@ public record UserAuthDto(
         String email,
         String passwordHash,
         UserRole role,
-        boolean isActive
+        boolean isActive,
+        int tokenVersion
 ) {
 }

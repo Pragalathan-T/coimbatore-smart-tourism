@@ -39,7 +39,12 @@ public class SecurityConfig {
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/api/v1/auth/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasAnyRole("ADMIN", "GUIDE", "TOURIST")
                         .requestMatchers(HttpMethod.POST, "/api/v1/guides/verification/apply").hasRole("GUIDE")
                         .requestMatchers(HttpMethod.GET, "/api/v1/guides/verification/me").hasRole("GUIDE")
@@ -47,6 +52,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/admin/verifications/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/places/**").hasAnyRole("ADMIN", "GUIDE", "TOURIST")
                         .requestMatchers("/api/v1/admin/places/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/bookings").hasRole("TOURIST")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/bookings/**").hasAnyRole("ADMIN", "GUIDE", "TOURIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/bookings/*/accept").hasRole("GUIDE")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/bookings/*/reject").hasRole("GUIDE")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/bookings/*/confirm").hasRole("TOURIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/bookings/*/cancel").hasRole("TOURIST")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

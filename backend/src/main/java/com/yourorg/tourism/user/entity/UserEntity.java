@@ -38,6 +38,9 @@ public class UserEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = Boolean.TRUE;
 
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -48,6 +51,9 @@ public class UserEntity {
         }
         if (isActive == null) {
             isActive = Boolean.TRUE;
+        }
+        if (tokenVersion == null) {
+            tokenVersion = 0;
         }
         if (createdAt == null) {
             createdAt = Instant.now();
@@ -116,5 +122,13 @@ public class UserEntity {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 }

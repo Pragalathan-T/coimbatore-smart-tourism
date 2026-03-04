@@ -32,3 +32,10 @@ app:
     jwt:
       secret: ${JWT_SECRET:abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ12}
       expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+      issuer: ${JWT_ISSUER:tourism-backend}
+      audience: ${JWT_AUDIENCE:tourism-api}
+  pagination:
+    max-size: ${APP_PAGINATION_MAX_SIZE:100}
+  guide:
+    verification:
+      cooldown-days: ${APP_GUIDE_VERIFICATION_COOLDOWN_DAYS:7}

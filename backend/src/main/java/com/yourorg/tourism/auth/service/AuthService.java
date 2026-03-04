@@ -64,7 +64,8 @@ public class AuthService {
             guideVerificationRepository.save(verification);
         }
 
-        String token = jwtService.generateToken(createdUser.id(), createdUser.role().name());
+        UserAuthDto authUser = userService.getAuthById(createdUser.id());
+        String token = jwtService.generateToken(authUser.id(), authUser.role().name(), authUser.tokenVersion());
         return new AuthTokenResponseDto(token, "Bearer");
     }
 
@@ -80,7 +81,7 @@ public class AuthService {
             throw new AppException(ErrorCode.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "Invalid credentials");
         }
 
-        String token = jwtService.generateToken(authUser.id(), authUser.role().name());
+        String token = jwtService.generateToken(authUser.id(), authUser.role().name(), authUser.tokenVersion());
         return new AuthTokenResponseDto(token, "Bearer");
     }
 

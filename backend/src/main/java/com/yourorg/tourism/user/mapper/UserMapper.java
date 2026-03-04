@@ -7,6 +7,8 @@ import com.yourorg.tourism.user.dto.UserAuthDto;
 import com.yourorg.tourism.user.dto.UserResponseDto;
 import com.yourorg.tourism.user.entity.UserEntity;
 
+import java.util.Objects;
+
 @Component
 public class UserMapper {
 
@@ -39,7 +41,8 @@ public class UserMapper {
                 entity.getEmail(),
                 entity.getPasswordHash(),
                 entity.getRole(),
-                Boolean.TRUE.equals(entity.getIsActive())
+                Boolean.TRUE.equals(entity.getIsActive()),
+                Objects.requireNonNullElse(entity.getTokenVersion(), 0)
         );
     }
 }

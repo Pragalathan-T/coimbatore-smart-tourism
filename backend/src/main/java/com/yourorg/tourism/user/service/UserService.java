@@ -2,6 +2,7 @@ package com.yourorg.tourism.user.service;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,9 +12,9 @@ import com.yourorg.tourism.user.dto.CreateUserCommandDto;
 import com.yourorg.tourism.user.dto.UserAuthDto;
 import com.yourorg.tourism.user.dto.UserResponseDto;
 import com.yourorg.tourism.user.entity.UserEntity;
+import com.yourorg.tourism.user.entity.UserRole;
 import com.yourorg.tourism.user.mapper.UserMapper;
 import com.yourorg.tourism.user.repository.UserRepository;
-import org.springframework.http.HttpStatus;
 
 @Service
 public class UserService {
@@ -47,6 +48,13 @@ public class UserService {
         return userMapper.toAuthDto(user);
     }
 
+    @Transactional(readOnly = true)
+    public UserAuthDto getAuthById(UUID id) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "Unauthorized"));
+        return userMapper.toAuthDto(user);
+    }
+
     @Transactional
     public UserResponseDto create(CreateUserCommandDto command) {
         String normalizedEmail = normalizeEmail(command.email());
@@ -64,6 +72,35 @@ public class UserService {
         ));
         UserEntity saved = userRepository.save(entity);
         return userMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public UserAuthDto setRoleAndIncrementTokenVersion(UUID id, UserRole role) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, "User not found"));
+        user.setRole(role);
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        UserEntity saved = userRepository.save(user);
+        return userMapper.toAuthDto(saved);
+    }
+
+    @Transactional
+    public UserAuthDto incrementTokenVersion(UUID id) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, "User not found"));
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        UserEntity saved = userRepository.save(user);
+        return userMapper.toAuthDto(saved);
+    }
+
+    @Transactional
+    public UserAuthDto deactivateAndIncrementTokenVersion(UUID id) {
+        UserEntity user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, "User not found"));
+        user.setIsActive(Boolean.FALSE);
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        UserEntity saved = userRepository.save(user);
+        return userMapper.toAuthDto(saved);
     }
 
     private String normalizeEmail(String email) {

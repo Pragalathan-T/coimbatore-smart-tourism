@@ -1,13 +1,19 @@
 package com.yourorg.tourism.guide.service;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.yourorg.tourism.common.audit.service.AuditEventService;
+import com.yourorg.tourism.common.config.PaginationGuard;
 import com.yourorg.tourism.common.exception.AppException;
 import com.yourorg.tourism.common.exception.ErrorCode;
 import com.yourorg.tourism.common.response.PageResponse;
@@ -32,17 +38,26 @@ public class GuideVerificationService {
     private final GuideVerificationAuditRepository auditRepository;
     private final GuideVerificationMapper verificationMapper;
     private final UserService userService;
+    private final PaginationGuard paginationGuard;
+    private final AuditEventService auditEventService;
+    private final int cooldownDays;
 
     public GuideVerificationService(
             GuideVerificationRepository verificationRepository,
             GuideVerificationAuditRepository auditRepository,
             GuideVerificationMapper verificationMapper,
-            UserService userService
+            UserService userService,
+            PaginationGuard paginationGuard,
+            AuditEventService auditEventService,
+            @Value("${app.guide.verification.cooldown-days:7}") int cooldownDays
     ) {
         this.verificationRepository = verificationRepository;
         this.auditRepository = auditRepository;
         this.verificationMapper = verificationMapper;
         this.userService = userService;
+        this.paginationGuard = paginationGuard;
+        this.auditEventService = auditEventService;
+        this.cooldownDays = cooldownDays;
     }
 
     @Transactional
@@ -50,12 +65,33 @@ public class GuideVerificationService {
         ensureRole(authenticatedUserId, UserRole.GUIDE);
 
         if (verificationRepository.existsByGuideIdAndStatus(authenticatedUserId, VerificationStatus.PENDING)) {
-            throw new AppException(ErrorCode.CONFLICT, HttpStatus.CONFLICT, "Pending verification already exists");
+            throw new AppException(ErrorCode.INVALID_STATE, HttpStatus.CONFLICT, "Pending verification already exists");
         }
 
+        verificationRepository.findTopByGuideIdAndStatusOrderByCreatedAtDesc(authenticatedUserId, VerificationStatus.REJECTED)
+                .ifPresent(lastRejected -> {
+                    if (lastRejected.getUpdatedAt() != null
+                            && lastRejected.getUpdatedAt().plusSeconds(cooldownDays * 24L * 60L * 60L).isAfter(java.time.Instant.now())) {
+                        String reapplyDate = lastRejected.getUpdatedAt()
+                                .plusSeconds(cooldownDays * 24L * 60L * 60L)
+                                .atOffset(ZoneOffset.UTC)
+                                .toLocalDate()
+                                .format(DateTimeFormatter.ISO_LOCAL_DATE);
+                        throw new AppException(
+                                ErrorCode.INVALID_STATE,
+                                HttpStatus.CONFLICT,
+                                "Reapply after " + reapplyDate
+                        );
+                    }
+                });
+
         GuideVerificationEntity entity = verificationMapper.toEntity(authenticatedUserId, request);
-        GuideVerificationEntity saved = verificationRepository.save(entity);
-        return verificationMapper.toResponse(saved);
+        try {
+            GuideVerificationEntity saved = verificationRepository.save(entity);
+            return verificationMapper.toResponse(saved);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AppException(ErrorCode.INVALID_STATE, HttpStatus.CONFLICT, "Pending verification already exists");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -69,6 +105,7 @@ public class GuideVerificationService {
 
     @Transactional(readOnly = true)
     public PageResponse<GuideVerificationResponseDto> listByStatus(VerificationStatus status, int page, int size) {
+        paginationGuard.validateSize(size);
         Page<GuideVerificationEntity> results = verificationRepository.findAllByStatus(status, PageRequest.of(page, size));
         return PageResponse.from(results.map(verificationMapper::toResponse));
     }
@@ -80,6 +117,17 @@ public class GuideVerificationService {
         GuideVerificationEntity verification = verificationRepository.findById(verificationId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, "Verification not found"));
 
+        if (verification.getStatus() != VerificationStatus.PENDING
+            || verification.getVerificationLevel() != VerificationLevel.BASIC) {
+            throw new AppException(
+                    ErrorCode.INVALID_STATE,
+                    HttpStatus.CONFLICT,
+                "Invalid verification state transition: only BASIC PENDING verifications can be approved"
+            );
+        }
+
+        String beforeJson = verificationSnapshotJson(verification);
+
         verification.setStatus(VerificationStatus.APPROVED);
         verification.setRejectionReason(null);
         if (!verification.getVerificationLevel().isAtLeast(VerificationLevel.ID_VERIFIED)) {
@@ -87,7 +135,26 @@ public class GuideVerificationService {
         }
 
         GuideVerificationEntity saved = verificationRepository.save(verification);
+        userService.setRoleAndIncrementTokenVersion(saved.getGuideId(), UserRole.GUIDE);
         auditRepository.save(verificationMapper.toAudit(saved.getId(), VerificationAuditAction.APPROVED, adminUserId, null));
+        auditEventService.record(
+            adminUserId,
+            UserRole.ADMIN.name(),
+            "VERIFICATION_APPROVED",
+            "GUIDE_VERIFICATION",
+            saved.getId(),
+            beforeJson,
+            verificationSnapshotJson(saved)
+        );
+        auditEventService.record(
+            adminUserId,
+            UserRole.ADMIN.name(),
+            "ROLE_PROMOTED_GUIDE",
+            "USER",
+            saved.getGuideId(),
+            "{\"role\":\"TOURIST_OR_GUIDE\"}",
+            "{\"role\":\"GUIDE\",\"tokenVersionIncremented\":true}"
+        );
         return verificationMapper.toResponse(saved);
     }
 
@@ -98,6 +165,15 @@ public class GuideVerificationService {
         GuideVerificationEntity verification = verificationRepository.findById(verificationId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, HttpStatus.NOT_FOUND, "Verification not found"));
 
+        if (verification.getStatus() != VerificationStatus.PENDING) {
+            throw new AppException(
+                    ErrorCode.INVALID_STATE,
+                    HttpStatus.CONFLICT,
+                    "Invalid verification state transition: only PENDING verifications can be rejected"
+            );
+        }
+
+        String beforeJson = verificationSnapshotJson(verification);
         verification.setStatus(VerificationStatus.REJECTED);
         verification.setRejectionReason(rejectionReason.trim());
 
@@ -108,6 +184,15 @@ public class GuideVerificationService {
                 adminUserId,
                 rejectionReason.trim()
         ));
+            auditEventService.record(
+                adminUserId,
+                UserRole.ADMIN.name(),
+                "VERIFICATION_REJECTED",
+                "GUIDE_VERIFICATION",
+                saved.getId(),
+                beforeJson,
+                verificationSnapshotJson(saved)
+            );
         return verificationMapper.toResponse(saved);
     }
 
@@ -150,5 +235,15 @@ public class GuideVerificationService {
             throw new AppException(ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN, "Access denied");
         }
         return user;
+    }
+
+    private String verificationSnapshotJson(GuideVerificationEntity verification) {
+        return "{" +
+                "\"status\":\"" + verification.getStatus().name() + "\"," +
+                "\"verificationLevel\":\"" + verification.getVerificationLevel().name() + "\"," +
+                "\"rejectionReason\":" + (verification.getRejectionReason() == null
+                ? "null"
+                : "\"" + verification.getRejectionReason().replace("\"", "\\\"") + "\"") +
+                "}";
     }
 }

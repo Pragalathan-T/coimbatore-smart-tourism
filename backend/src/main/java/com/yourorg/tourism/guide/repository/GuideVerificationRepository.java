@@ -16,6 +16,8 @@ public interface GuideVerificationRepository extends JpaRepository<GuideVerifica
 
     Optional<GuideVerificationEntity> findTopByGuideIdOrderByCreatedAtDesc(UUID guideId);
 
+    Optional<GuideVerificationEntity> findTopByGuideIdAndStatusOrderByCreatedAtDesc(UUID guideId, VerificationStatus status);
+
     Optional<GuideVerificationEntity> findTopByGuideIdAndStatusOrderByUpdatedAtDesc(UUID guideId, VerificationStatus status);
 
     Page<GuideVerificationEntity> findAllByStatus(VerificationStatus status, Pageable pageable);

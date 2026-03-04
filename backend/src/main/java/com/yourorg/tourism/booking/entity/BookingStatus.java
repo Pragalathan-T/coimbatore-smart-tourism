@@ -3,7 +3,10 @@ package com.yourorg.tourism.booking.entity;
 public enum BookingStatus {
     REQUESTED,
     ACCEPTED,
-    REJECTED,
+    CONFIRMED,
+    IN_PROGRESS,
+    RATED,
+    COMPLETED,
     CANCELLED,
-    COMPLETED
+    REJECTED,
 }
