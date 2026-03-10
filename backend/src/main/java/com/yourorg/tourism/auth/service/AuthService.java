@@ -1,5 +1,7 @@
 package com.yourorg.tourism.auth.service;
 
+import java.time.Instant;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -66,7 +68,15 @@ public class AuthService {
 
         UserAuthDto authUser = userService.getAuthById(createdUser.id());
         String token = jwtService.generateToken(authUser.id(), authUser.role().name(), authUser.tokenVersion());
-        return new AuthTokenResponseDto(token, "Bearer");
+        long expiresAtEpoch = Instant.now().plusMillis(jwtService.getExpirationMs()).getEpochSecond();
+        return AuthTokenResponseDto.of(
+                token,
+                "Bearer",
+                authUser.role().name(),
+                authUser.id(),
+                authUser.tokenVersion(),
+                expiresAtEpoch
+        );
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +92,15 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(authUser.id(), authUser.role().name(), authUser.tokenVersion());
-        return new AuthTokenResponseDto(token, "Bearer");
+        long expiresAtEpoch = Instant.now().plusMillis(jwtService.getExpirationMs()).getEpochSecond();
+        return AuthTokenResponseDto.of(
+                token,
+                "Bearer",
+                authUser.role().name(),
+                authUser.id(),
+                authUser.tokenVersion(),
+                expiresAtEpoch
+        );
     }
 
     private void validateGuideVerificationInput(String idProofUrl, String selfieUrl) {

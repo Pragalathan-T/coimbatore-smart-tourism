@@ -35,6 +35,10 @@ public class JwtService {
         this.jwtAudience = jwtAudience;
     }
 
+    public long getExpirationMs() {
+        return jwtExpirationMs;
+    }
+
     public String generateToken(UUID userId, String role) {
         return generateToken(userId, role, 0);
     }
